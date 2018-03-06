@@ -1,0 +1,62 @@
+---
+- hosts: local
+  remote_user: root
+  tasks:
+  - name: Ensure product directory exist
+    stat: 
+      path: "{{local_repo_dir}}/{{product}}"
+    register: product_dir
+  - name: Create directory if necessary
+    file:
+      path: "{{local_repo_dir}}/{{product}}"
+      state: directory
+    when: product_dir.stat.isdir is undefined
+  - name: Ensure topic directory exist
+    stat:
+      path: "{{local_repo_dir}}/{{product}}/{{topic}}"
+    register: topic_dir
+  - name: Create topic directory if necessary
+    file:
+      path: "{{local_repo_dir}}/{{product}}/{{topic}}"
+      state: directory
+    when: topic_dir.stat.isdir is undefined
+  - name: Ensure master directory exist
+    stat:
+      path: "{{local_repo_dir}}/{{product}}/{{topic}}/{{master_dir}}"
+    register: st_master 
+  - name: Create master directory when needed
+    file:
+      path: "{{local_repo_dir}}/{{product}}/{{topic}}/{{master_dir}}"
+      state: directory
+    when: st_master.stat.isdir is undefined
+  - name: Delete File
+    file:
+      path: "{{local_repo_dir}}/{{product}}/{{topic}}/rhel-listing"
+      state: absent
+  - name: Download RHEL Build Listing
+    get_url:
+      url: "{{build_url}}"
+      dest: "{{local_repo_dir}}/{{product}}/{{topic}}/rhel-listing"
+      mode: 0440
+  - name: Get all build versions
+    shell: cat "{{local_repo_dir}}/{{product}}/{{topic}}/rhel-listing" | grep RHEL-8.0 | sed 's/.*\(RHEL-8.0-.*\)\/<.*/\1/' | grep -v 20180222
+    register: listing
+  - name: Check items
+    debug:
+      msg: '{{ item }}'
+    with_items: "{{ listing.stdout_lines }}"
+  - include: syncrepo.yml tag={{item}}
+    with_items: "{{ listing.stdout_lines }}"
+- hosts: dci-repo
+  remote_user: root
+  tasks:
+    - name: Delete File
+      file:
+        path: "{{remote_repo_dir}}/{{product}}/{{topic}}/"
+        state: directory
+    - synchronize:
+        src: "{{local_repo_dir}}/{{product}}/{{topic}}/"
+        dest: "{{remote_repo_dir}}/{{product}}/{{topic}}/"
+        rsync_opts:
+          - "-H"
+          - "-D"

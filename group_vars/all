@@ -1,0 +1,6 @@
+product: XXX
+topic: XXX
+local_repo_dir: /repo
+remote_repo_dir: /repo
+master_dir: XXX
+build_url: XXX

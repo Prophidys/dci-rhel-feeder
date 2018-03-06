@@ -1,0 +1,29 @@
+---
+- name: Get or Create Component
+  dci_component:
+    name: '{{ tag }}'
+    type: 'OSTree'
+    canonical_project_name: '{{ tag }}'
+    url: '{{build_url}}/{{tag}}'
+    data: '{}'
+    topic_id: '{{ topic }}'
+  register: create
+- name: Check if it's already sync
+  stat:
+    path: "{{local_repo_dir}}/{{product}}/{{topic}}/{{create.component.id}}"
+  register: st
+- block:
+  - name: add repository
+    yum_repository:
+      name: "{{master_dir}}"
+      description: '{{tag}}'
+      baseurl: {{build_url}}/{{tag}}/compose/BaseOS/x86_64/os/
+  - name: Reposync the component
+    shell: reposync --repoid='{{master_dir}}' -n -d -p "{{local_repo_dir}}/{{product}}/{{topic}}/"
+  - name: Do a snapshot
+    shell: cp -al "{{local_repo_dir}}/{{product}}/{{topic}}/{{master_dir}}" "{{local_repo_dir}}/{{product}}/{{topic}}/{{create.component.id}}"
+  - name: Delete Repo
+    yum_repository:
+      name: "{{master_dir}}"
+      state: absent
+  when: st.stat.isdir is not defined
